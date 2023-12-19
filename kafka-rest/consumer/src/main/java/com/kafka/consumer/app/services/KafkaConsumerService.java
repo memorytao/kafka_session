@@ -1,44 +1,34 @@
 package com.kafka.consumer.app.services;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import io.micrometer.common.util.StringUtils;
+import com.kafka.consumer.app.config.KafkaConsumerConfigs;
 
 @Service
 public class KafkaConsumerService {
 
-    @KafkaListener(topics = "wikimedia.recentchange", id = "1")
-    public void consume(String message) {
+    @Autowired
+    KafkaConsumerConfigs configs;
 
-        if (StringUtils.isNotBlank(message)) {
-            // System.out.println("Received message: " + message);
+    @Value("${kafka.topic}")
+    private String kafkaTopic;
 
-            JsonElement element = JsonParser.parseString(message);
-            JsonObject jsonObject = element.getAsJsonObject();
+    public void setKafkaTopic(String kafkaTopic) {
+        this.kafkaTopic = kafkaTopic;
+    }
 
-            String name = jsonObject.get("user").getAsString();
+    @KafkaListener(groupId = "groupId", topics = "${kafka.topic}")
+    public void getMessage(String smg) {
 
-            if (StringUtils.isNotBlank(name)) {
-
-                System.out.println(name);
-                // Path filePath = Paths.get(
-                // "/Users/memorytao/development/kafka/kafka2/app/src/main/resources/files/" +
-                // name + ".json");
-                // try {
-                // Files.write(filePath, message.getBytes(), StandardOpenOption.CREATE,
-                // StandardOpenOption.WRITE);
-                // } catch (IOException e) {
-                // // TODO Auto-generated catch block
-                // e.printStackTrace();
-                // }
-            }
-
-        }
+        System.out.println(smg);
 
     }
+
+    public void addNewConfig() {
+        configs.initKafkaConsumer(null);   
+    }
+
 }
