@@ -1,7 +1,7 @@
 package com.kafka.consumer.app.services;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
@@ -13,22 +13,20 @@ public class KafkaConsumerService {
     @Autowired
     KafkaConsumerConfigs configs;
 
-    @Value("${kafka.topic}")
-    private String kafkaTopic;
+    @KafkaListener(groupId = "GROUP_ID_1", topics = "demo_topic")
+    public void getFirstTopic(ConsumerRecord<String, String> record) {
+        System.out.println("First Topic value: " + record.value());
 
-    public void setKafkaTopic(String kafkaTopic) {
-        this.kafkaTopic = kafkaTopic;
     }
 
-    @KafkaListener(groupId = "groupId", topics = "${kafka.topic}")
-    public void getMessage(String smg) {
+    @KafkaListener(groupId = "GROUP_ID_2", topics = "demo_topic_2")
+    public void getSecondTopic(ConsumerRecord<String, String> record) {
 
-        System.out.println(smg);
-
+        System.out.println("Second Topic value: " + record.value());
     }
 
     public void addNewConfig() {
-        configs.initKafkaConsumer(null);   
+        configs.initKafkaConsumer(null);
     }
 
 }

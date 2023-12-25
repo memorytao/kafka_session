@@ -10,10 +10,6 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-
 public class BIKafkaConsumer {
 
     public static Logger log = LoggerFactory.getLogger(BIKafkaConsumer.class.getSimpleName());
@@ -21,6 +17,8 @@ public class BIKafkaConsumer {
     public static void main(String[] args) {
 
         log.info("Start to consume...");
+
+        String topic = args[0];
 
         KafkaConsumer<String, String> consumer = new KafkaConsumerConfigs().iniConsumer(null);
 
@@ -31,7 +29,7 @@ public class BIKafkaConsumer {
             public void run() {
                 // TODO Auto-generated method stub
                 // super.run();
-                // log.info("Detected shutdown..............");
+                log.info("Detected shutdown..............");
                 consumer.wakeup();
 
                 try {
@@ -45,10 +43,10 @@ public class BIKafkaConsumer {
 
         try {
 
-            long endTime = System.currentTimeMillis() + 20000;
+            long endTime = System.currentTimeMillis() + 30000;
 
-            consumer.subscribe(Arrays.asList("wikimedia.recentchange"));
-            for (; true ;) {
+            consumer.subscribe(Arrays.asList(topic));
+            for (; System.currentTimeMillis() < endTime;) {
 
                 log.info("Cousuming..... ");
 

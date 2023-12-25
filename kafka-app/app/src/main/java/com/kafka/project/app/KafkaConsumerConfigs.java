@@ -2,6 +2,7 @@ package com.kafka.project.app;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -13,12 +14,12 @@ public class KafkaConsumerConfigs {
 
     Map<String, Object> prop = new HashMap<>();
 
-    String groupId = "first-group-id";
+    // String groupId = "first-group-id";
     
     prop.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     prop.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     prop.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-    prop.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    prop.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
     prop.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
     if (props != null && !props.isEmpty()) {
