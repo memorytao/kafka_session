@@ -15,8 +15,9 @@ public class KafkaConsumerConfigs {
     Map<String, Object> prop = new HashMap<>();
 
     // String groupId = "first-group-id";
-    
-    prop.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    String host = "localhost:9092";
+
+    prop.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, host);
     prop.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     prop.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     prop.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
