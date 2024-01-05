@@ -1,5 +1,6 @@
 package com.kafka.project.app;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,11 +57,14 @@ public class BIKafkaConsumer {
 
             Calendar endTime = Calendar.getInstance();
             endTime.set(Calendar.HOUR_OF_DAY, 17);
-
             long endTimeOfDay = endTime.getTime().getTime();
 
             consumer.subscribe(Arrays.asList(topic));
-            for (; System.currentTimeMillis() < endTimeOfDay;) {
+
+            // consumer.currentLag(null);
+
+            while (true) {
+                // while (System.currentTimeMillis() < endTimeOfDay) {
 
                 log.info("Cousuming..... ");
 
@@ -68,8 +72,10 @@ public class BIKafkaConsumer {
 
                 for (ConsumerRecord<String, String> record : records) {
 
-                    log.info("value: " + record);
-                    createFile(record.value());
+                    log.info("offset : " + record.offset() + " partition :" + record.partition() + " count :"
+                            + records.count());
+
+                    createPackageMasterFile(record.offset(), record.value());
 
                 }
             }
@@ -87,7 +93,19 @@ public class BIKafkaConsumer {
 
     }
 
-    public static void createFile(String value) {
+    public static void checkDirectory() {
+
+        // String pathToFile = "/program_path/run/";
+        String pathToFile = "../../../../../resources/files/";
+
+        File directory = new File(pathToFile);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+    }
+
+    public static void createPackageMasterFile(long offset, String value) {
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMdd");
         String dateInString = simpleDateFormat.format(new Date());
@@ -97,13 +115,13 @@ public class BIKafkaConsumer {
         String data = "";
         Object[] obj = jsonObject.keySet().toArray();
         for (int i = 0; i < jsonObject.keySet().size(); i++) {
-            data += jsonObject.get(obj[i].toString()) + "|";
+            data += offset + "|" + jsonObject.get(obj[i].toString()) + "|";
             if (obj.length - 1 == i)
                 data += "\n";
         }
 
         String path = "/Users/memorytao/development/kafka/kafka_session/kafka-app/app/src/main/resources/files/";
-        String fileName = dateInString + "_TOPIC_NAME.txt";
+        String fileName = dateInString + "_TOPIC_NAME_PPM.txt";
         Path file = Paths.get(path + fileName);
 
         try {

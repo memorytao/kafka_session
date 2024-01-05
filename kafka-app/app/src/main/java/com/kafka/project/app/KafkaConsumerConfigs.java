@@ -22,6 +22,7 @@ public class KafkaConsumerConfigs {
     prop.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     prop.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
     prop.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    // prop.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
     if (props != null && !props.isEmpty()) {
       prop.putAll(props);
