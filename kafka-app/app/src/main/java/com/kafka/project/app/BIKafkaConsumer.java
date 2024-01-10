@@ -5,11 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Date;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -26,12 +26,114 @@ public class BIKafkaConsumer {
 
     public static Logger log = LoggerFactory.getLogger(BIKafkaConsumer.class.getSimpleName());
 
+    public static String FILE_STATUS_PATH = "/app/src/main/resources/program_path/run";
+    public static String FILE_OUTPUT_PATH = "/app/src/main/resources/program_path/output";
+    public static String FILE_BACKUP_PATH = "/app/src/main/resources/program_path/backup";
+
     public static void main(String[] args) {
+
+        // String topic = args[0];
+
+        String topic = "demo_topic";
+
+        createFileStatus(topic, "Failed|", "", FILE_STATUS_PATH);
+        consumeData(topic);
+
+        File files = Paths.get(checkDirectory(FILE_OUTPUT_PATH)).toFile();
+
+        if (files.list().length == 0) {
+            createFileStatus(topic, "Failed|", "Data not found", FILE_STATUS_PATH);
+        } else {
+            createFileStatus(topic, "Success|", "", FILE_OUTPUT_PATH);
+            copyFileToBackup();
+        }
+
+    }
+
+    public static void copyFileToBackup() {
+
+        Path source = Paths.get(FILE_OUTPUT_PATH);
+        Path target = Paths.get(FILE_BACKUP_PATH);
+
+        try {
+
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+        } catch (Exception e) {
+            // TODO: handle exception
+            log.error(e.getMessage(), e.getCause());
+        }
+
+    }
+
+    public static void createFileStatus(String topicName, String status, String details, String paths) {
+
+        // main directory : /program_path/run/
+        String path = checkDirectory(paths);
+        String fileName = topicName + "_requested_status.txt";
+        Path fileFullPath = Paths.get(path + "/" + fileName);
+        String content = status + details;
+        try {
+
+            Files.writeString(fileFullPath, content, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e.getCause());
+        }
+
+    }
+
+    public static String checkDirectory(String paths) {
+
+        // main directory : /program_path/run/
+        String currentDir = System.getProperty("user.dir");
+        String path = currentDir + paths;
+        File file = new File(path);
+
+        file.listFiles();
+
+        if (!file.exists()) {
+            file.mkdirs();
+        }
+        return file.getAbsolutePath();
+    }
+
+    public static void createPackageMasterFiles(String topicName, long offset, String value) {
+
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMdd");
+        String dateInString = simpleDateFormat.format(new Date());
+
+        JsonObject jsonObject = JsonParser.parseString(value).getAsJsonObject();
+
+        String data = "";
+        Object[] obj = jsonObject.keySet().toArray();
+        for (int i = 0; i < jsonObject.keySet().size(); i++) {
+            data += offset + "|" + jsonObject.get(obj[i].toString()) + "|";
+            if (obj.length - 1 == i)
+                data += "\n";
+        }
+
+        String path = checkDirectory(FILE_OUTPUT_PATH);
+        String fileName = dateInString + "_" + topicName + "_ppm.txt";
+        Path file = Paths.get(path + fileName);
+
+        try {
+
+            Files.writeString(file, data, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e.getCause());
+        }
+    }
+
+    public static void consumeData(String topicName) {
 
         log.info("Start to consume...");
 
-        // String topic = args[0];
-        String topic = "demo_topic";
+        // String topic = "demo_topic";
+        String topic = topicName;
 
         KafkaConsumer<String, String> consumer = new KafkaConsumerConfigs().iniConsumer(null);
 
@@ -55,28 +157,34 @@ public class BIKafkaConsumer {
 
         try {
 
-            Calendar endTime = Calendar.getInstance();
-            endTime.set(Calendar.HOUR_OF_DAY, 17);
-            long endTimeOfDay = endTime.getTime().getTime();
+            // int END_TIME_OF_DAY = 15;
+            // Calendar endTime = Calendar.getInstance();
+            // endTime.set(Calendar.HOUR_OF_DAY, END_TIME_OF_DAY);
+            // long endTimeOfDay = endTime.getTime().getTime();
+
+            boolean isConsume = true;
+            int countToShutDown = 0;
 
             consumer.subscribe(Arrays.asList(topic));
 
-            // consumer.currentLag(null);
-
-            while (true) {
+            while (isConsume) {
                 // while (System.currentTimeMillis() < endTimeOfDay) {
 
                 log.info("Cousuming..... ");
 
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
+                if (records.count() == 0)
+                    countToShutDown++;
+                if (countToShutDown == 20)
+                    isConsume = false;
+
                 for (ConsumerRecord<String, String> record : records) {
 
                     log.info("offset : " + record.offset() + " partition :" + record.partition() + " count :"
                             + records.count());
-
-                    createPackageMasterFile(record.offset(), record.value());
-
+                    createPackageMasterFiles(topic, record.offset(), record.value());
+                    countToShutDown = 0;
                 }
             }
         } catch (WakeupException wakeupException) {
@@ -89,47 +197,6 @@ public class BIKafkaConsumer {
 
             consumer.close();
             log.info(" Consumer fully shutdown");
-        }
-
-    }
-
-    public static void checkDirectory() {
-
-        // String pathToFile = "/program_path/run/";
-        String pathToFile = "../../../../../resources/files/";
-
-        File directory = new File(pathToFile);
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
-
-    }
-
-    public static void createPackageMasterFile(long offset, String value) {
-
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMdd");
-        String dateInString = simpleDateFormat.format(new Date());
-
-        JsonObject jsonObject = JsonParser.parseString(value).getAsJsonObject();
-
-        String data = "";
-        Object[] obj = jsonObject.keySet().toArray();
-        for (int i = 0; i < jsonObject.keySet().size(); i++) {
-            data += offset + "|" + jsonObject.get(obj[i].toString()) + "|";
-            if (obj.length - 1 == i)
-                data += "\n";
-        }
-
-        String path = "/Users/memorytao/development/kafka/kafka_session/kafka-app/app/src/main/resources/files/";
-        String fileName = dateInString + "_TOPIC_NAME_PPM.txt";
-        Path file = Paths.get(path + fileName);
-
-        try {
-
-            Files.writeString(file, data, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
         }
 
     }
