@@ -177,6 +177,7 @@ public class BIKafkaConsumer {
             int countToShutDown = 0;
 
             consumer.subscribe(Arrays.asList(topic));
+            long offset = 2413;
 
             while (isConsume) {
                 // while (System.currentTimeMillis() < endTimeOfDay) {
@@ -192,12 +193,13 @@ public class BIKafkaConsumer {
 
                 for (ConsumerRecord<String, String> record : records) {
 
-                    log.info("offset : " + record.offset() + " partition :" + record.partition());
-                    createPackageMasterFiles(topic, record.offset(), record.value());
-                    countToShutDown = 0;
+                    if (record.offset() > offset) {
 
+                        log.info("offset : " + record.offset());
+                        createPackageMasterFiles(topic, record.offset(), record.value());
+                        countToShutDown = 0;
+                    }
                 }
-                consumer.commitSync();
             }
 
         } catch (WakeupException wakeupException) {
