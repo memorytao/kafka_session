@@ -27,37 +27,49 @@ public class BIKafkaConsumer {
     public static Logger log = LoggerFactory.getLogger(BIKafkaConsumer.class.getSimpleName());
 
     public static String FILE_STATUS_PATH = "/app/src/main/resources/program_path/run";
-    public static String FILE_OUTPUT_PATH = "/app/src/main/resources/program_path/output";
+    public static String FILE_OUTPUT_PATH = "/app/src/main/resources/program_path/kafka_output";
     public static String FILE_BACKUP_PATH = "/app/src/main/resources/program_path/backup";
+    public static String CURRENT_PATH = System.getProperty("user.dir");
 
     public static void main(String[] args) {
 
         // String topic = args[0];
 
-        String topic = "demo_topic";
+        String topic = "";
+        topic = "pepay-sync-master";
+        // topic = "prepay-sync-desc";
+        // topic = "prepay-sync-bundle-desc";
 
         createFileStatus(topic, "Failed|", "", FILE_STATUS_PATH);
         consumeData(topic);
 
         File files = Paths.get(checkDirectory(FILE_OUTPUT_PATH)).toFile();
 
+        log.info(String.valueOf(files.list().length));
         if (files.list().length == 0) {
-            createFileStatus(topic, "Failed|", "Data not found", FILE_STATUS_PATH);
+            createFileStatus(topic, "Failed|", "No change ", FILE_STATUS_PATH);
         } else {
-            createFileStatus(topic, "Success|", "", FILE_OUTPUT_PATH);
+            createFileStatus(topic, "Success|", "", FILE_STATUS_PATH);
             copyFileToBackup();
         }
-
     }
 
     public static void copyFileToBackup() {
 
-        Path source = Paths.get(FILE_OUTPUT_PATH);
-        Path target = Paths.get(FILE_BACKUP_PATH);
+        checkDirectory(FILE_BACKUP_PATH);
+        Path source = Paths.get(CURRENT_PATH + FILE_OUTPUT_PATH);
+        Path target = Paths.get(CURRENT_PATH + FILE_BACKUP_PATH);
 
         try {
 
-            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            File files = source.toFile();
+
+            for (String fileName : files.list()) {
+
+                System.out.println(source.toAbsolutePath() + "/" + fileName);
+                Files.copy(Paths.get(source.toAbsolutePath() + "/" + fileName),
+                        target.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            }
 
         } catch (Exception e) {
             // TODO: handle exception
@@ -71,7 +83,7 @@ public class BIKafkaConsumer {
         // main directory : /program_path/run/
         String path = checkDirectory(paths);
         String fileName = topicName + "_requested_status.txt";
-        Path fileFullPath = Paths.get(path + "/" + fileName);
+        Path fileFullPath = Paths.get(path + "/" + fileName.replaceAll("-", "_"));
         String content = status + details;
         try {
 
@@ -87,8 +99,7 @@ public class BIKafkaConsumer {
     public static String checkDirectory(String paths) {
 
         // main directory : /program_path/run/
-        String currentDir = System.getProperty("user.dir");
-        String path = currentDir + paths;
+        String path = CURRENT_PATH + paths;
         File file = new File(path);
 
         file.listFiles();
@@ -115,8 +126,8 @@ public class BIKafkaConsumer {
         }
 
         String path = checkDirectory(FILE_OUTPUT_PATH);
-        String fileName = dateInString + "_" + topicName + "_ppm.txt";
-        Path file = Paths.get(path + fileName);
+        String fileName = dateInString + "_" + topicName.replaceAll("-", "_") + "_ppm.txt";
+        Path file = Paths.get(path + "/" + fileName);
 
         try {
 
@@ -174,19 +185,21 @@ public class BIKafkaConsumer {
 
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
 
-                if (records.count() == 0)
+                if (records.isEmpty())
                     countToShutDown++;
                 if (countToShutDown == 20)
                     isConsume = false;
 
                 for (ConsumerRecord<String, String> record : records) {
 
-                    log.info("offset : " + record.offset() + " partition :" + record.partition() + " count :"
-                            + records.count());
+                    log.info("offset : " + record.offset() + " partition :" + record.partition());
                     createPackageMasterFiles(topic, record.offset(), record.value());
                     countToShutDown = 0;
+
                 }
+                consumer.commitSync();
             }
+
         } catch (WakeupException wakeupException) {
             log.info("Consumer is starting shut down" + wakeupException.getMessage());
 
