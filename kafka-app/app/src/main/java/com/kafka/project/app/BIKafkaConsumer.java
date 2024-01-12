@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -39,7 +40,6 @@ public class BIKafkaConsumer {
         topic = "pepay-sync-master";
         // topic = "prepay-sync-desc";
         // topic = "prepay-sync-bundle-desc";
-
         createFileStatus(topic, "Failed|", "", FILE_STATUS_PATH);
         consumeData(topic);
 
@@ -52,6 +52,41 @@ public class BIKafkaConsumer {
             createFileStatus(topic, "Success|", "", FILE_STATUS_PATH);
             copyFileToBackup();
         }
+    }
+
+    public static void createLatestOffset(long offset) {
+
+        try {
+
+            String offsetFile = "/latest_offset.txt";
+            Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
+            Files.writeString(path, String.valueOf(offset), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+    }
+
+    public static long getLatestOffset() {
+
+        try {
+
+            String offsetFile = "/latest_offset.txt";
+            Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
+
+            if(!path.toFile().exists()){
+                Files.writeString(path, String.valueOf(0), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            }
+            
+            List<String> offsets = Files.readAllLines(path);
+            return Long.valueOf(offsets.get(0));
+
+        } catch (Exception e) {
+            // TODO: handle exception
+            log.error(" get offeset error " + e.getMessage(), e.getCause());
+        }
+
+        return -1;
     }
 
     public static void copyFileToBackup() {
@@ -177,7 +212,7 @@ public class BIKafkaConsumer {
             int countToShutDown = 0;
 
             consumer.subscribe(Arrays.asList(topic));
-            long offset = 2413;
+            long offset = getLatestOffset();
 
             while (isConsume) {
                 // while (System.currentTimeMillis() < endTimeOfDay) {
@@ -197,6 +232,7 @@ public class BIKafkaConsumer {
 
                         log.info("offset : " + record.offset());
                         createPackageMasterFiles(topic, record.offset(), record.value());
+                        createLatestOffset(record.offset());
                         countToShutDown = 0;
                     }
                 }
