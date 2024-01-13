@@ -60,7 +60,8 @@ public class BIKafkaConsumer {
 
             String offsetFile = "/latest_offset.txt";
             Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
-            Files.writeString(path, String.valueOf(offset), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            String content = String.valueOf(offset);
+            Files.writeString(path, content, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
 
         } catch (Exception e) {
             // TODO: handle exception
@@ -74,10 +75,10 @@ public class BIKafkaConsumer {
             String offsetFile = "/latest_offset.txt";
             Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
 
-            if(!path.toFile().exists()){
+            if (!path.toFile().exists()) {
                 Files.writeString(path, String.valueOf(0), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             }
-            
+
             List<String> offsets = Files.readAllLines(path);
             return Long.valueOf(offsets.get(0));
 
@@ -227,6 +228,10 @@ public class BIKafkaConsumer {
                     isConsume = false;
 
                 for (ConsumerRecord<String, String> record : records) {
+
+                    if (record.offset() == 0) {
+                        offset = -1;
+                    }
 
                     if (record.offset() > offset) {
 
