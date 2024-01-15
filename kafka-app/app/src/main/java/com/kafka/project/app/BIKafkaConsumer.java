@@ -1,6 +1,7 @@
 package com.kafka.project.app;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,7 +12,10 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -27,74 +31,125 @@ public class BIKafkaConsumer {
 
     public static Logger log = LoggerFactory.getLogger(BIKafkaConsumer.class.getSimpleName());
 
-    public static String FILE_STATUS_PATH = "/app/src/main/resources/program_path/run";
-    public static String FILE_OUTPUT_PATH = "/app/src/main/resources/program_path/kafka_output";
-    public static String FILE_BACKUP_PATH = "/app/src/main/resources/program_path/backup";
     public static String CURRENT_PATH = System.getProperty("user.dir");
+    public static String RESOURCE_PATH = "/app/src/main/resources";
+    public static String FILE_CONFIG = "/config.properties";
 
     public static void main(String[] args) {
 
-        // String topic = args[0];
+        /*
+         * There are 3 Topics ** updated on 15 Jan 2024
+         * List of topics prepay-sync-master, prepay-sync-desc, prepay-sync-bundle-desc
+         */
 
-        String topic = "";
-        topic = "pepay-sync-master";
-        // topic = "prepay-sync-desc";
-        // topic = "prepay-sync-bundle-desc";
-        createFileStatus(topic, "Failed|", "", FILE_STATUS_PATH);
+        // String topic = getPropertiesValue(args[0]);
+        String topic = getPropertiesValue("prepay.sync.master.topic");
+        createFileStatus(topic, "Failed|", "", getPropertiesValue("status.path"));
         consumeData(topic);
-
-        File files = Paths.get(checkDirectory(FILE_OUTPUT_PATH)).toFile();
-
+        File files = Paths.get(checkDirectory(getPropertiesValue("output.path"))).toFile();
         log.info(String.valueOf(files.list().length));
+
         if (files.list().length == 0) {
-            createFileStatus(topic, "Failed|", "No change ", FILE_STATUS_PATH);
+            createFileStatus(topic, "Failed|", "No change ", getPropertiesValue("status.path"));
         } else {
-            createFileStatus(topic, "Success|", "", FILE_STATUS_PATH);
+            createFileStatus(topic, "Success|", "", getPropertiesValue("status.path"));
             copyFileToBackup();
+        }
+
+    }
+
+    public static void getLostConnection() {
+
+        if (log.isErrorEnabled()) {
+            log.error("-------");
+        }
+
+        
+    }
+
+    public static String getPropertiesValue(String configName) {
+
+        try {
+
+            FileInputStream fileInputStream = new FileInputStream(CURRENT_PATH + RESOURCE_PATH + FILE_CONFIG);
+            Properties properties = new Properties();
+            properties.load(fileInputStream);
+            System.out.println(properties.getProperty(configName));
+            return properties.getProperty(configName);
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public static void sendEmail() {
+
+        try {
+
+            Process process = Runtime.getRuntime().exec(getPropertiesValue("send.email.script"));
+
+            try {
+                int success = process.waitFor();
+
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } // Wait for script completion
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
-    public static void createLatestOffset(long offset) {
+    public static void createLatestOffset(long offset, long timestamp) {
 
         try {
 
             String offsetFile = "/latest_offset.txt";
-            Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
-            String content = String.valueOf(offset);
+            Path path = Paths.get(CURRENT_PATH + getPropertiesValue("status.path") + offsetFile);
+            String content = String.valueOf(offset) + "," + String.valueOf(timestamp);
             Files.writeString(path, content, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
 
         } catch (Exception e) {
             // TODO: handle exception
+            log.error(e.getMessage(), e.getCause());
         }
     }
 
-    public static long getLatestOffset() {
+    public static Map<String, Object> getLatestOffset() {
 
         try {
 
             String offsetFile = "/latest_offset.txt";
-            Path path = Paths.get(CURRENT_PATH + FILE_STATUS_PATH + offsetFile);
+            Path path = Paths.get(CURRENT_PATH + getPropertiesValue("status.path") + offsetFile);
+            Map<String, Object> resp = new HashMap<>();
 
             if (!path.toFile().exists()) {
-                Files.writeString(path, String.valueOf(0), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                String initContent = "0,0";
+                Files.writeString(path, initContent, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             }
 
             List<String> offsets = Files.readAllLines(path);
-            return Long.valueOf(offsets.get(0));
+            String[] latest = offsets.get(0).split(",");
+            resp.put("offset", Long.valueOf(latest[0]));
+            resp.put("timestamp", Long.valueOf(latest[1]));
+            return resp;
 
         } catch (Exception e) {
             // TODO: handle exception
             log.error(" get offeset error " + e.getMessage(), e.getCause());
         }
 
-        return -1;
+        return null;
     }
 
     public static void copyFileToBackup() {
 
-        checkDirectory(FILE_BACKUP_PATH);
-        Path source = Paths.get(CURRENT_PATH + FILE_OUTPUT_PATH);
-        Path target = Paths.get(CURRENT_PATH + FILE_BACKUP_PATH);
+        checkDirectory(getPropertiesValue("backup.path"));
+        Path source = Paths.get(CURRENT_PATH + getPropertiesValue("output.path"));
+        Path target = Paths.get(CURRENT_PATH + getPropertiesValue("backup.path"));
 
         try {
 
@@ -161,7 +216,7 @@ public class BIKafkaConsumer {
                 data += "\n";
         }
 
-        String path = checkDirectory(FILE_OUTPUT_PATH);
+        String path = checkDirectory(getPropertiesValue("output.path"));
         String fileName = dateInString + "_" + topicName.replaceAll("-", "_") + "_ppm.txt";
         Path file = Paths.get(path + "/" + fileName);
 
@@ -185,7 +240,6 @@ public class BIKafkaConsumer {
         KafkaConsumer<String, String> consumer = new KafkaConsumerConfigs().iniConsumer(null);
 
         final Thread thread = Thread.currentThread();
-
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -204,16 +258,17 @@ public class BIKafkaConsumer {
 
         try {
 
-            // int END_TIME_OF_DAY = 15;
-            // Calendar endTime = Calendar.getInstance();
-            // endTime.set(Calendar.HOUR_OF_DAY, END_TIME_OF_DAY);
-            // long endTimeOfDay = endTime.getTime().getTime();
+            // long endTime = new Date().getTime();
+            // endTime+=1200000;
 
             boolean isConsume = true;
             int countToShutDown = 0;
 
             consumer.subscribe(Arrays.asList(topic));
-            long offset = getLatestOffset();
+
+            Map<String, Object> latest = getLatestOffset();
+            long latestOffset = (long) latest.get("offset");
+            long latestTimeStamp = (long) latest.get("timestamp");
 
             while (isConsume) {
                 // while (System.currentTimeMillis() < endTimeOfDay) {
@@ -227,17 +282,21 @@ public class BIKafkaConsumer {
                 if (countToShutDown == 20)
                     isConsume = false;
 
+                
+
                 for (ConsumerRecord<String, String> record : records) {
 
-                    if (record.offset() == 0) {
-                        offset = -1;
+                    boolean isFistTimeConsume = record.offset() == 0 && latestTimeStamp < record.timestamp();
+                    boolean isNewDataToConsume = latestOffset < record.offset();
+                    if (isFistTimeConsume || isNewDataToConsume) {
+                        latestOffset = -1;
                     }
 
-                    if (record.offset() > offset) {
+                    if (record.offset() > latestOffset) {
 
                         log.info("offset : " + record.offset());
                         createPackageMasterFiles(topic, record.offset(), record.value());
-                        createLatestOffset(record.offset());
+                        createLatestOffset(record.offset(), record.timestamp());
                         countToShutDown = 0;
                     }
                 }
