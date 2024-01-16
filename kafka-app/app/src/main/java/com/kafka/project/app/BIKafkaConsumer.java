@@ -47,8 +47,6 @@ public class BIKafkaConsumer {
         createFileStatus(topic, "Failed|", "", getPropertiesValue("status.path"));
         consumeData(topic);
         File files = Paths.get(checkDirectory(getPropertiesValue("output.path"))).toFile();
-        log.info(String.valueOf(files.list().length));
-
         if (files.list().length == 0) {
             createFileStatus(topic, "Failed|", "No change ", getPropertiesValue("status.path"));
         } else {
@@ -58,13 +56,12 @@ public class BIKafkaConsumer {
 
     }
 
-    public static void getLostConnection() {
+    public static void checkBrokerConnection() throws Exception {
 
         if (log.isErrorEnabled()) {
-            log.error("-------");
+            throw new Exception("  ");
         }
 
-        
     }
 
     public static String getPropertiesValue(String configName) {
@@ -260,19 +257,17 @@ public class BIKafkaConsumer {
 
             // long endTime = new Date().getTime();
             // endTime+=1200000;
-
             boolean isConsume = true;
             int countToShutDown = 0;
-
-            consumer.subscribe(Arrays.asList(topic));
-
             Map<String, Object> latest = getLatestOffset();
             long latestOffset = (long) latest.get("offset");
             long latestTimeStamp = (long) latest.get("timestamp");
 
+            consumer.subscribe(Arrays.asList(topic));
+
             while (isConsume) {
                 // while (System.currentTimeMillis() < endTimeOfDay) {
-
+                // checkBrokerConnection();
                 log.info("Cousuming..... ");
 
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
@@ -282,10 +277,9 @@ public class BIKafkaConsumer {
                 if (countToShutDown == 20)
                     isConsume = false;
 
-                
-
                 for (ConsumerRecord<String, String> record : records) {
 
+                    // Headers headers = record.headers();
                     boolean isFistTimeConsume = record.offset() == 0 && latestTimeStamp < record.timestamp();
                     boolean isNewDataToConsume = latestOffset < record.offset();
                     if (isFistTimeConsume || isNewDataToConsume) {
@@ -309,7 +303,6 @@ public class BIKafkaConsumer {
             // TODO: handle exception
             log.error(" Unexpected " + e.getMessage());
         } finally {
-
             consumer.close();
             log.info(" Consumer fully shutdown");
         }
